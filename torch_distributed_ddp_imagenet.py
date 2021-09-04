@@ -65,7 +65,7 @@ def parse():
     parser.add_argument("--local_rank", default=os.getenv('LOCAL_RANK', 0), type=int)
     parser.add_argument('--sync_bn', action='store_true', help='enabling apex sync BN.')
 
-    parser.add_argument('--opt-level', type=str,default='O2')
+    parser.add_argument('--opt-level', type=str,default='O0')
     parser.add_argument('--keep-batchnorm-fp32', type=str, default=None)
     parser.add_argument('--loss-scale', type=str, default=None)
     parser.add_argument('--channels-last', type=bool, default=False)
@@ -381,6 +381,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         if args.prof >= 0: torch.cuda.nvtx.range_push("prefetcher.next()")
         input, target = prefetcher.next()
         if args.prof >= 0: torch.cuda.nvtx.range_pop()
+        # if i>= 51: break
 
         # Pop range "Body of iteration {}".format(i)
         if args.prof >= 0: torch.cuda.nvtx.range_pop()
