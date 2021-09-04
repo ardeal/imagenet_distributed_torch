@@ -16,6 +16,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 import numpy as np
+import copy
 
 try:
     from apex.parallel import DistributedDataParallel as DDP
@@ -37,7 +38,8 @@ def fast_collate(batch, memory_format):
         if(nump_array.ndim < 3):
             nump_array = np.expand_dims(nump_array, axis=-1)
         nump_array = np.rollaxis(nump_array, 2)
-        tensor[i] += torch.from_numpy(nump_array)
+        nump_array_writable = copy.deepcopy(nump_array)
+        tensor[i] += torch.from_numpy(nump_array_writable)
     return tensor, targets
 
 
