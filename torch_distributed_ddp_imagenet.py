@@ -47,7 +47,8 @@ def parse():
     model_names = sorted(name for name in models.__dict__ if name.islower() and not name.startswith("__") and callable(models.__dict__[name]))
 
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-    parser.add_argument('--data', type=str, default='/workspace/ssd2/DATA/imagenet', metavar='DIR', help='path to dataset')
+    # parser.add_argument('--data', type=str, default='/workspace/ssd2/DATA/imagenet', metavar='DIR', help='path to dataset')
+    parser.add_argument('--data', type=str, default='/home/zhiqiang/imagenet_50000', metavar='DIR', help='path to dataset')
     parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18', choices=model_names, help='model architecture: | '.join(model_names) + ' (default: resnet18)')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N', help='number of total epochs to run')
@@ -56,7 +57,7 @@ def parse():
     parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, metavar='LR', help='Initial learning rate.  Will be scaled by <global batch size>/256: args.lr = args.lr*float(args.batch_size*args.world_size)/256.  A warmup schedule will also be applied over the first 5 epochs.')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float, metavar='W', help='weight decay (default: 1e-4)')
-    parser.add_argument('--print-freq', '-p', default=50, type=int, metavar='N', help='print frequency (default: 10)')
+    parser.add_argument('--print-freq', '-p', default=1, type=int, metavar='N', help='print frequency (default: 10)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true', help='use pre-trained model')
@@ -73,6 +74,13 @@ def parse():
     parser.add_argument('--channels-last', type=bool, default=False)
     args = parser.parse_args()
     return args
+
+# how to compile apex:
+# conda activate xxx
+# git clone git@github.com:NVIDIA/apex.git
+# cd apex
+# git reset --hard ebcd7f084bba96bdb0c3fdf396c3c6b02e745042
+# pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
 def main():
     global best_prec1, args
@@ -209,12 +217,12 @@ def main():
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler, collate_fn=collate_fn)
+        num_workers=args.workers, pin_memory=False, sampler=train_sampler, collate_fn=collate_fn)
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True,
+        num_workers=args.workers, pin_memory=False,
         sampler=val_sampler,
         collate_fn=collate_fn)
 
