@@ -47,8 +47,7 @@ def parse():
     model_names = sorted(name for name in models.__dict__ if name.islower() and not name.startswith("__") and callable(models.__dict__[name]))
 
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-    # parser.add_argument('--data', type=str, default='/workspace/ssd2/DATA/imagenet', metavar='DIR', help='path to dataset')
-    parser.add_argument('--data', type=str, default='/home/zhiqiang/imagenet_50000', metavar='DIR', help='path to dataset')
+    parser.add_argument('--data', type=str, default='/ssd2/imagenet_50000', metavar='DIR', help='path to dataset')
     parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18', choices=model_names, help='model architecture: | '.join(model_names) + ' (default: resnet18)')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N', help='number of total epochs to run')
@@ -57,7 +56,7 @@ def parse():
     parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, metavar='LR', help='Initial learning rate.  Will be scaled by <global batch size>/256: args.lr = args.lr*float(args.batch_size*args.world_size)/256.  A warmup schedule will also be applied over the first 5 epochs.')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float, metavar='W', help='weight decay (default: 1e-4)')
-    parser.add_argument('--print-freq', '-p', default=1, type=int, metavar='N', help='print frequency (default: 10)')
+    parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency (default: 10)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true', help='use pre-trained model')
