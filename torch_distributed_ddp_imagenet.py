@@ -2,6 +2,8 @@ import argparse
 import os
 import shutil
 import time
+import logging
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -17,6 +19,9 @@ import torchvision.models as models
 
 import numpy as np
 import copy
+
+_logger = logging.getLogger('APEX_DDP')
+_logger.setLevel(logging.INFO)
 
 try:
     from apex.parallel import DistributedDataParallel as DDP
@@ -47,16 +52,16 @@ def parse():
     model_names = sorted(name for name in models.__dict__ if name.islower() and not name.startswith("__") and callable(models.__dict__[name]))
 
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-    parser.add_argument('--data', type=str, default='/ssd2/imagenet_50000', metavar='DIR', help='path to dataset')
+    parser.add_argument('--data', type=str, default='/ssd2/imagenet', metavar='DIR', help='path to dataset')
     parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet18', choices=model_names, help='model architecture: | '.join(model_names) + ' (default: resnet18)')
-    parser.add_argument('-j', '--workers', default=4, type=int, metavar='N', help='number of data loading workers (default: 4)')
+    parser.add_argument('-j', '--workers', default=32, type=int, metavar='N', help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
     parser.add_argument('-b', '--batch-size', default=128, type=int, metavar='N', help='mini-batch size per process (default: 256)')
     parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, metavar='LR', help='Initial learning rate.  Will be scaled by <global batch size>/256: args.lr = args.lr*float(args.batch_size*args.world_size)/256.  A warmup schedule will also be applied over the first 5 epochs.')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float, metavar='W', help='weight decay (default: 1e-4)')
-    parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency (default: 10)')
+    parser.add_argument('--print-freq', '-p', default=50, type=int, metavar='N', help='print frequency (default: 10)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true', help='use pre-trained model')
@@ -85,11 +90,27 @@ def main():
     global best_prec1, args
 
     args = parse()
-    print("opt_level = {}".format(args.opt_level))
-    print("keep_batchnorm_fp32 = {}".format(args.keep_batchnorm_fp32), type(args.keep_batchnorm_fp32))
-    print("loss_scale = {}".format(args.loss_scale), type(args.loss_scale))
 
-    print("\nCUDNN VERSION: {}\n".format(torch.backends.cudnn.version()))
+    if args.local_rank == 0:
+        # logging.root.handlers = []
+        logfilename = 'log_{}.txt'.format(datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
+        formatter = logging.Formatter("%(message)s")
+        handler = logging.FileHandler(logfilename)
+        handler.setFormatter(formatter)
+        # handler.setLevel(logging.INFO)
+        _logger.addHandler(handler)
+
+
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        # handler.setLevel(logging.INFO)
+        _logger.addHandler(handler)
+
+    if args.local_rank == 0:
+        _logger.info("opt_level = {}".format(args.opt_level))
+        # _logger.info("keep_batchnorm_fp32 = {}, type=={}".format(args.keep_batchnorm_fp32), type(args.keep_batchnorm_fp32))
+        # _logger.info("loss_scale = {}, type=={}".format(args.loss_scale), type(args.loss_scale))
+        _logger.info("\nCUDNN VERSION: {}\n".format(torch.backends.cudnn.version()))
 
     cudnn.benchmark = True
     best_prec1 = 0
@@ -122,15 +143,15 @@ def main():
 
     # create model
     if args.pretrained:
-        print("=> using pre-trained model '{}'".format(args.arch))
+        _logger.info("=> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](pretrained=True)
     else:
-        print("=> creating model '{}'".format(args.arch))
+        _logger.info("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()
 
     if args.sync_bn:
         import apex
-        print("using apex synced BN")
+        _logger.info("using apex synced BN")
         model = apex.parallel.convert_syncbn_model(model)
 
     model = model.cuda().to(memory_format=memory_format)
@@ -168,17 +189,17 @@ def main():
         # Use a local scope to avoid dangling references
         def resume():
             if os.path.isfile(args.resume):
-                print("=> loading checkpoint '{}'".format(args.resume))
+                _logger.info("=> loading checkpoint '{}'".format(args.resume))
                 checkpoint = torch.load(args.resume, map_location = lambda storage, loc: storage.cuda(args.gpu))
                 args.start_epoch = checkpoint['epoch']
                 global best_prec1
                 best_prec1 = checkpoint['best_prec1']
                 model.load_state_dict(checkpoint['state_dict'])
                 optimizer.load_state_dict(checkpoint['optimizer'])
-                print("=> loaded checkpoint '{}' (epoch {})"
+                _logger.info("=> loaded checkpoint '{}' (epoch {})"
                       .format(args.resume, checkpoint['epoch']))
             else:
-                print("=> no checkpoint found at '{}'".format(args.resume))
+                _logger.info("=> no checkpoint found at '{}'".format(args.resume))
         resume()
 
     # Data loading code
@@ -322,7 +343,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     while input is not None:
         i += 1
         if args.prof >= 0 and i == args.prof:
-            print("Profiling begun at iteration {}".format(i))
+            _logger.info("Profiling begun at iteration {}".format(i))
             torch.cuda.cudart().cudaProfilerStart()
 
         if args.prof >= 0: torch.cuda.nvtx.range_push("Body of iteration {}".format(i))
@@ -376,7 +397,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
             end = time.time()
 
             if args.local_rank == 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
+                _logger.info('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Speed {3:.3f} ({4:.3f})\t'
                       'Loss {loss.val:.10f} ({loss.avg:.4f})\t'
@@ -396,7 +417,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         if args.prof >= 0: torch.cuda.nvtx.range_pop()
 
         if args.prof >= 0 and i == args.prof + 10:
-            print("Profiling ended at iteration {}".format(i))
+            _logger.info("Profiling ended at iteration {}".format(i))
             torch.cuda.cudart().cudaProfilerStop()
             quit()
 
@@ -443,7 +464,7 @@ def validate(val_loader, model, criterion):
 
         # TODO:  Change timings to mirror train().
         if args.local_rank == 0 and i % args.print_freq == 0:
-            print('Test: [{0}/{1}]\t'
+            _logger.info('Test: [{0}/{1}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Speed {2:.3f} ({3:.3f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
@@ -457,7 +478,7 @@ def validate(val_loader, model, criterion):
 
         input, target = prefetcher.next()
 
-    print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
+    _logger.info(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
           .format(top1=top1, top5=top5))
 
     return top1.avg
