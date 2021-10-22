@@ -107,7 +107,7 @@ def main():
         _logger.addHandler(handler)
 
     if args.local_rank == 0:
-        _logger.info('args=={}'.fromat(args))
+        _logger.info('args=={}'.format(args))
         # _logger.info("keep_batchnorm_fp32 = {}, type=={}".format(args.keep_batchnorm_fp32), type(args.keep_batchnorm_fp32))
         # _logger.info("loss_scale = {}, type=={}".format(args.loss_scale), type(args.loss_scale))
         _logger.info("\nCUDNN VERSION: {}\n".format(torch.backends.cudnn.version()))
