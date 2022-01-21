@@ -81,7 +81,8 @@ def parse():
 
 # how to compile apex:
 # conda activate xxx
-# git clone git@github.com:NVIDIA/apex.git
+# git clone git@github.com:NVIDIA/apex.git, or:
+# git clone https://github.com/NVIDIA/apex.git
 # cd apex
 # git reset --hard ebcd7f084bba96bdb0c3fdf396c3c6b02e745042
 # pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
